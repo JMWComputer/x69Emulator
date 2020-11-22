@@ -793,6 +793,9 @@ int main(int argc, char* argv[], char* envp[])
 			{
 				auto _opt = arg.substr(1, _optionEnd - 1);
 				std::cout << "found option: " << _opt << '\n';
+
+				
+
 			};
 
 
