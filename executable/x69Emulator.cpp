@@ -11,38 +11,196 @@
 #include <filesystem>
 #include <string>
 
-#pragma region ANSI_CONSTANTS
-
-constexpr static inline const char* ANSI_RESET = "\033[0m";
-constexpr static inline const char* ANSI_BLACK = "\033[30m";      /* Black */
-constexpr static inline const char* ANSI_RED = "\033[31m";      /* Red */
-constexpr static inline const char* ANSI_GREEN = "\033[32m";      /* Green */
-constexpr static inline const char* ANSI_YELLOW = "\033[33m";      /* Yellow */
-constexpr static inline const char* ANSI_BLUE = "\033[34m";      /* Blue */
-constexpr static inline const char* ANSI_MAGENTA = "\033[35m";      /* Magenta */
-constexpr static inline const char* ANSI_CYAN = "\033[36m";      /* Cyan */
-constexpr static inline const char* ANSI_WHITE = "\033[37m";      /* White */
-constexpr static inline const char* ANSI_BOLDBLACK = "\033[1m\033[30m";      /* Bold Black */
-constexpr static inline const char* ANSI_BOLDRED = "\033[1m\033[31m";      /* Bold Red */
-constexpr static inline const char* ANSI_BOLDGREEN = "\033[1m\033[32m";      /* Bold Green */
-constexpr static inline const char* ANSI_BOLDYELLOW = "\033[1m\033[33m";      /* Bold Yellow */
-constexpr static inline const char* ANSI_BOLDBLUE = "\033[1m\033[34m";      /* Bold Blue */
-constexpr static inline const char* ANSI_BOLDMAGENTA = "\033[1m\033[35m";      /* Bold Magenta */
-constexpr static inline const char* ANSI_BOLDCYAN = "\033[1m\033[36m";      /* Bold Cyan */
-constexpr static inline const char* ANSI_BOLDWHITE = "\033[1m\033[37m";      /* Bold White */
-
-#pragma endregion ANSI_CONSTANTS
-
 template <typename T>
 constexpr static inline T twos(T _v) noexcept
 {
 	return !_v + 1;
 };
 
+#if defined(WIN32) || defined(_WIN32) || defined(_WIN32_) || defined(_NT_)
+
+#include <Windows.h>
+
+#undef min
+#undef max
+
+#pragma region ANSI_CONSTANTS
+
+namespace ccodes
+{
+	namespace impl
+	{
+		HANDLE hConsole = GetStdHandle(STD_OUTPUT_HANDLE);
+	};
+
+	constexpr static inline auto NONE = 15;
+	constexpr static inline auto BLACK = 0;
+	constexpr static inline auto RED = 12;
+	constexpr static inline auto GREEN = 10;
+	constexpr static inline auto YELLOW = 14;
+	constexpr static inline auto BLUE = 9;
+	//constexpr static inline auto MAGENTA = "\033[35m";
+	//constexpr static inline auto CYAN = "\033[36m";
+	constexpr static inline auto WHITE = 15;
+	//constexpr static inline auto BOLDBLACK = "\033[1m\033[30m";
+	//constexpr static inline auto BOLDRED = "\033[1m\033[31m";
+	//constexpr static inline auto BOLDGREEN = "\033[1m\033[32m";
+	//constexpr static inline auto BOLDYELLOW = "\033[1m\033[33m";
+	//constexpr static inline auto BOLDBLUE = "\033[1m\033[34m";
+	//constexpr static inline auto BOLDMAGENTA = "\033[1m\033[35m";
+	//constexpr static inline auto BOLDCYAN = "\033[1m\033[36m";
+	//constexpr static inline auto BOLDWHITE = "\033[1m\033[37m";
+
+	void set_text_color(std::ostream& _ostr, int _col)
+	{
+		SetConsoleTextAttribute(impl::hConsole, _col);
+	};
+
+};
+
+#pragma endregion ANSI_CONSTANTS
+
+
+#elif defined(__linux__) || defined(__unix__)
+
+#pragma region ANSI_CONSTANTS
+
+namespace ccodes
+{
+
+	constexpr static inline auto NONE = "\033[0m";
+	constexpr static inline auto BLACK = "\033[30m";      /* Black */
+	constexpr static inline auto RED = "\033[31m";      /* Red */
+	constexpr static inline auto GREEN = "\033[32m";      /* Green */
+	constexpr static inline auto YELLOW = "\033[33m";      /* Yellow */
+	constexpr static inline auto BLUE = "\033[34m";      /* Blue */
+	//constexpr static inline auto MAGENTA = "\033[35m";      /* Magenta */
+	//constexpr static inline auto CYAN = "\033[36m";      /* Cyan */
+	constexpr static inline auto WHITE = "\033[37m";      /* White */
+	//constexpr static inline auto BOLDBLACK = "\033[1m\033[30m";      /* Bold Black */
+	//constexpr static inline auto BOLDRED = "\033[1m\033[31m";      /* Bold Red */
+	//constexpr static inline auto BOLDGREEN = "\033[1m\033[32m";      /* Bold Green */
+	//constexpr static inline auto BOLDYELLOW = "\033[1m\033[33m";      /* Bold Yellow */
+	//constexpr static inline auto BOLDBLUE = "\033[1m\033[34m";      /* Bold Blue */
+	//constexpr static inline auto BOLDMAGENTA = "\033[1m\033[35m";      /* Bold Magenta */
+	//constexpr static inline auto BOLDCYAN = "\033[1m\033[36m";      /* Bold Cyan */
+	//constexpr static inline auto BOLDWHITE = "\033[1m\033[37m";      /* Bold White */
+
+	void set_text_color(std::ostream& _ostr, const char* _col)
+	{
+		_ostr << _col;
+	};
+
+};
+
+#pragma endregion ANSI_CONSTANTS
+
+#else
+
+namespace ccodes
+{
+	void set_text_color(std::ostream& _ostr, const char* _col)
+	{};
+}
+
+
+#endif
+
+struct color
+{
+public:
+	enum COLORS
+	{
+		RED,
+		BLUE,
+		WHITE,
+		BLACK,
+		YELLOW,
+		GREEN,
+		NONE
+	};
+
+private:
+	template <COLORS Col>
+	struct color_t
+	{
+		friend inline std::ostream& operator<<(std::ostream& _ostr, const color_t<Col>& _col)
+		{
+			if constexpr (Col == COLORS::NONE)
+			{
+				ccodes::set_text_color(_ostr, ccodes::NONE);
+			}
+			else if constexpr (Col == COLORS::RED)
+			{
+				ccodes::set_text_color(_ostr, ccodes::RED);
+			}
+			else if constexpr (Col == COLORS::BLUE)
+			{
+				ccodes::set_text_color(_ostr, ccodes::BLUE);
+			}
+			else if constexpr (Col == COLORS::GREEN)
+			{
+				ccodes::set_text_color(_ostr, ccodes::GREEN);
+			}
+			else if constexpr (Col == COLORS::WHITE)
+			{
+				ccodes::set_text_color(_ostr, ccodes::WHITE);
+			}
+			else if constexpr (Col == COLORS::BLACK)
+			{
+				ccodes::set_text_color(_ostr, ccodes::BLACK);
+			}
+			else if constexpr (Col == COLORS::YELLOW)
+			{
+				ccodes::set_text_color(_ostr, ccodes::YELLOW);
+			}
+			else
+			{
+				static_assert(false);
+			};
+
+			return _ostr;
+		};
+	};
+
+public:
+
+	static inline constexpr auto none = color_t<COLORS::NONE>{};
+	static inline constexpr auto red = color_t<COLORS::RED>{};
+	static inline constexpr auto blue = color_t<COLORS::BLUE>{};
+	static inline constexpr auto white = color_t<COLORS::WHITE>{};
+	static inline constexpr auto black = color_t<COLORS::BLACK>{};
+	static inline constexpr auto yellow = color_t<COLORS::YELLOW>{};
+	static inline constexpr auto green = color_t<COLORS::GREEN>{};
+
+};
+
+
+
+
+
+template <typename T>
+struct Register
+{
+	using value_type = T;
+
+	operator T& () noexcept { return this->val_; };
+	constexpr operator const T& () const noexcept { return this->val_; };
+
+	Register& operator=(T _val) noexcept
+	{
+		this->val_ = _val;
+		return *this;
+	};
+
+	T val_;
+};
+
 template <uint8_t GeneralRegisters, typename WordType, typename DirectMemAddrType>
 struct CPUTraits
 {
 	using word_type = WordType;
+	using register_type = Register<typename word_type>;
 
 	using direct_address_type = DirectMemAddrType;
 
@@ -81,9 +239,12 @@ struct CPURegisters
 public:
 	using cpu_traits = CPUVersionTraits;
 	using word_type = typename cpu_traits::word_type;
+	using register_type = typename cpu_traits::register_type;
+
+	using value_type = register_type;
 
 private:
-	using ContainerT = std::array<word_type, cpu_traits::general_registers()>;
+	using ContainerT = std::array<value_type, cpu_traits::general_registers()>;
 
 public:
 	using iterator = typename ContainerT::iterator;
@@ -108,29 +269,29 @@ public:
 	constexpr const_reverse_iterator rend() const noexcept { return this->regs_.crend(); };
 	constexpr const_reverse_iterator crend() const noexcept { return this->regs_.crend(); };
 
-	word_type& at(uint8_t _r) noexcept
+	value_type& at(uint8_t _r) noexcept
 	{
 		return this->regs_.at(_r);
 	};
-	constexpr const word_type& at(uint8_t _r) const noexcept
+	constexpr const value_type& at(uint8_t _r) const noexcept
 	{
 		return this->regs_.at(_r);
 	};
 
-	constexpr word_type read(uint8_t _r) const noexcept
+	constexpr value_type read(uint8_t _r) const noexcept
 	{
 		return this->at(_r);
 	};
-	void write(uint8_t _r, word_type _val) noexcept
+	void write(uint8_t _r, value_type _val) noexcept
 	{
 		this->at(_r) = _val;
 	};
 
-	word_type& operator[](uint8_t _r) noexcept
+	value_type& operator[](uint8_t _r) noexcept
 	{
 		return this->at(_r);
 	};
-	constexpr const word_type& operator[](uint8_t _r) const noexcept
+	constexpr const value_type& operator[](uint8_t _r) const noexcept
 	{
 		return this->at(_r);
 	};
@@ -140,7 +301,7 @@ public:
 		uint8_t _rnum = 0;
 		for (auto& r : _regs)
 		{
-			_ostr << ANSI_BLUE << "r" << (int)_rnum++ << ANSI_RESET << " : 0x" << std::hex << (int)r << std::dec << "\n";
+			_ostr << color::blue << "r" << (int)_rnum++ << color::none << " : 0x" << std::hex << (int)r << std::dec << "\n";
 		};
 		return _ostr;
 	};
@@ -213,7 +374,9 @@ struct SpecialRegisters
 public:
 	using cpu_traits = CPUVersionTraits;
 	using word_type = typename cpu_traits::word_type;
-	using value_type = typename cpu_traits::direct_address_type;
+	using register_type = typename cpu_traits::register_type;
+	
+	using value_type = register_type;
 
 	enum REGISTERS : uint8_t
 	{
@@ -264,7 +427,7 @@ public:
 	{
 		return this->at(_r);
 	};
-	void write(REGISTERS _r, value_type _val) noexcept
+	void write(REGISTERS _r, word_type _val) noexcept
 	{
 		this->at(_r) = _val;
 	};
@@ -280,10 +443,10 @@ public:
 
 	friend inline std::ostream& operator<<(std::ostream& _ostr, SpecialRegisters& _regs)
 	{
-		_ostr << ANSI_YELLOW << "pc  " << ANSI_RESET << " : 0x" << std::hex << (int)_regs.at(PC) << std::dec << "\n";
-		_ostr << ANSI_YELLOW << "lr  " << ANSI_RESET <<	" : 0x" << std::hex << (int)_regs.at(LR) << std::dec << "\n";
-		_ostr << ANSI_YELLOW << "sp  " << ANSI_RESET << " : 0x" << std::hex << (int)_regs.at(SP) << std::dec << "\n";
-		_ostr << ANSI_YELLOW << "addr" << ANSI_RESET << " : 0x" << std::hex << (int)_regs.at(ADDR) << std::dec << "\n";
+		_ostr << color::yellow << "pc  " << color::none << " : 0x" << std::hex << (int)_regs.at(PC) << std::dec << "\n";
+		_ostr << color::yellow << "lr  " << color::none <<	" : 0x" << std::hex << (int)_regs.at(LR) << std::dec << "\n";
+		_ostr << color::yellow << "sp  " << color::none << " : 0x" << std::hex << (int)_regs.at(SP) << std::dec << "\n";
+		_ostr << color::yellow << "addr" << color::none << " : 0x" << std::hex << (int)_regs.at(ADDR) << std::dec << "\n";
 		return _ostr;
 	};
 
@@ -747,6 +910,7 @@ Memory direct_memory{};
 
 std::vector<uint8_t> load_x69_machine_code(const std::filesystem::path& _path)
 {
+	std::cout << "Reading " << _path << '\n';
 	assert(std::filesystem::exists(_path));
 	if (_path.is_relative())
 		std::filesystem::relative(_path);
@@ -767,7 +931,7 @@ std::vector<uint8_t> load_x69_machine_code(const std::filesystem::path& _path)
 	return _bytes;
 };
 
-int main(int argc, char* argv[], char* envp[])
+int imain(int argc, char* argv[], char* envp[])
 {
 	std::cout << "x69 Emulator v0.0.1\n";
 
@@ -778,26 +942,36 @@ int main(int argc, char* argv[], char* envp[])
 		_args.push_back(argv[i]);
 	};
 
-	std::filesystem::path _bootFile{ "boot.o" };
+	std::filesystem::path _bootFile{ "./boot.o" };
 
-	for (auto& arg : _args)
+	std::cout << "arg count = " << _args.size() << '\n';
+
+	for (auto it = _args.begin(); it != _args.end(); ++it)
 	{
-		if (arg == "help")
+		const auto& arg = *it;
+		if (arg == "-help")
 		{
 			std::cout << "Usage:\n [-boot <path to boot code>](default to boot.o)\n";
 		}
 		else if (arg.front() == '-')
 		{
-			auto _optionEnd = arg.find(' ');
-			if (_optionEnd != std::string::npos)
+			const auto& _opt = arg;
+			auto _param = it;
+
+			if (it < _args.end() - 1)
 			{
-				auto _opt = arg.substr(1, _optionEnd - 1);
-				std::cout << "found option: " << _opt << '\n';
-
-				
-
+				_param = it + 1;
+				if (_opt == "-boot")
+				{
+					_bootFile = std::filesystem::relative(*_param);
+					std::cout << "Set build file to : \n";
+				}
+				else
+				{
+					std::cout << "Unrecognized arguement : " << _opt << '\n';
+					abort();
+				};
 			};
-
 
 		};
 	};
@@ -816,4 +990,9 @@ int main(int argc, char* argv[], char* envp[])
 	std::cout << _cpu.special_regs() << '\n';
 
 	return 0;
+}
+
+int main(int argc, char* argv[], char* envp[])
+{
+	return imain(argc, argv, envp);
 };
