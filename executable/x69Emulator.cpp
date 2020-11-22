@@ -968,7 +968,7 @@ int imain(int argc, char* argv[], char* envp[])
 				}
 				else
 				{
-					std::cout << "Unrecognized arguement : " << _opt << '\n';
+					std::cout << "Bad Arguement : " << _opt << '\n';
 					abort();
 				};
 			};
