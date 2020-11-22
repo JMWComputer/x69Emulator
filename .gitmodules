@@ -1,0 +1,3 @@
+[submodule "terminal/lib/tvision"]
+	path = terminal/lib/tvision
+	url = https://github.com/magiblot/tvision
