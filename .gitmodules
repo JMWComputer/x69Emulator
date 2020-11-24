@@ -1,3 +1,9 @@
 [submodule "terminal/lib/tvision"]
 	path = terminal/lib/tvision
 	url = https://github.com/magiblot/tvision
+[submodule "tools/source/assembler"]
+	path = tools/source/assembler
+	url = https://github.com/JMWComputer/Assembler
+[submodule "tools/compiler"]
+	path = tools/compiler
+	url = https://github.com/JMWComputer/JMWC
