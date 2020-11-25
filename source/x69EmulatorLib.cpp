@@ -2,17 +2,33 @@
 
 #include <x69Terminal.h>
 
+
 namespace x69::emu
 {
-	std::vector<uint8_t> load_x69_machine_code(const std::filesystem::path& _path)
+
+}
+
+
+
+namespace x69::emu
+{
+	std::optional<std::vector<uint8_t>> load_x69_machine_code(const std::filesystem::path& _path)
 	{
-		std::cout << "Reading " << _path << '\n';
-		assert(std::filesystem::exists(_path));
+		if (!std::filesystem::exists(_path))
+		{
+			return std::nullopt;
+		};
+		
 		if (_path.is_relative())
+		{
 			std::filesystem::relative(_path);
+		};
 
 		std::ifstream _ifstr{ _path, std::ifstream::binary };
-		assert(_ifstr.is_open());
+		if (!_ifstr.is_open())
+		{
+			return std::nullopt;
+		};
 
 		std::vector<uint8_t> _bytes{};
 		char _buff[256]{};
@@ -62,13 +78,14 @@ namespace x69::emu
 
 
 	};
-
+	
 }
 
 #pragma region TERMINAL_PERIPHERAL
 
 namespace x69::emu
 {
+
 	void TerminalPeriphal::write_to_control(uint8_t _val)
 	{
 		if ((_val & (uint8_t)CONTROL_BITS::WRITE) != 0)
@@ -87,6 +104,10 @@ namespace x69::emu
 		{
 			this->open(this->x_, this->y_);
 		}
+		else if ((_val & (uint8_t)CONTROL_BITS::CLEAR) != 0)
+		{
+			peripheral::terminal::clear_terminal();
+		}
 		else
 		{
 			// ignore
@@ -104,20 +125,13 @@ namespace x69::emu
 
 	void TerminalPeriphal::open(uint8_t _width, uint8_t _height)
 	{
-		if (!this->is_open_)
-		{
-			peripheral::terminal::open_terminal(_width, _height);
-			is_open_ = true;
-		};
+		peripheral::terminal::open_terminal(_width, _height);
 	};
 	void TerminalPeriphal::close()
 	{
-		if (this->is_open_)
-		{
-			peripheral::terminal::close_terminal();
-			is_open_ = false;
-		};
+		peripheral::terminal::close_terminal();
 	};
+
 };
 
 #pragma endregion TERMINAL_PERIPHERAL

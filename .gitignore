@@ -16,6 +16,9 @@
 # Mono auto generated files
 mono_crash.*
 
+# Environment File
+executable/env.txt
+
 # Build results
 [Dd]ebug/
 [Dd]ebugPublic/

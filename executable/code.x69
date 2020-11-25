@@ -1,0 +1,13 @@
+__start:
+	set r0, 0x3 
+	call TEST_LABEL
+	jmp __end
+
+TEST_LABEL:
+	set r1, 0x5
+	inc r4
+	ret
+
+__end:
+	set r2, 0x12
+	jmp __end

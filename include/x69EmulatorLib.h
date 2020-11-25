@@ -111,6 +111,7 @@ namespace x69::emu
 namespace x69::emu
 {
 
+
 	template <typename T>
 	constexpr static inline T twos(T _v) noexcept
 	{
@@ -223,6 +224,8 @@ namespace x69::emu
 
 	using CPUVersionTraits = CPUTraits<16, uint8_t, uint16_t>;
 
+
+
 	struct Instruction
 	{
 	public:
@@ -328,6 +331,20 @@ namespace x69::emu
 	{
 		uint8_t bits = 0x00;
 
+		constexpr bool is_locked() const noexcept
+		{
+			return this->locked_;
+		};
+
+		void lock() noexcept
+		{
+			this->locked_ = true;
+		};
+		void unlock() noexcept
+		{
+			this->locked_ = false;
+		};
+
 		enum FLAGS : uint8_t
 		{
 			ZERO = 0x01,
@@ -345,7 +362,10 @@ namespace x69::emu
 
 		void set(FLAGS _f) noexcept
 		{
-			this->bits |= (uint8_t)_f;
+			if (!this->is_locked())
+			{
+				this->bits |= (uint8_t)_f;
+			};
 		};
 		void clear(FLAGS _f) noexcept
 		{
@@ -366,7 +386,10 @@ namespace x69::emu
 
 		void set_all_to(bool _to) noexcept
 		{
-			this->bits = (_to) ? 0xFF : 0x00;
+			if (!this->is_locked())
+			{
+				this->bits = (_to) ? 0xFF : 0x00;
+			};
 		};
 
 		void clear_all() noexcept
@@ -377,6 +400,9 @@ namespace x69::emu
 		{
 			this->set_all_to(true);
 		};
+
+	private:
+		bool locked_ = false;
 
 	};
 
@@ -495,7 +521,8 @@ namespace x69::emu
 			OPEN	=		0b00000001,
 			CLOSE	=		0b00000010,
 			READ	=		0b00000100,
-			WRITE	=		0b00001000
+			WRITE	=		0b00001000,
+			CLEAR	=		0b00010000
 		};
 
 		uint8_t control_ = 0;
@@ -674,8 +701,6 @@ namespace x69::emu
 		ContainerT data_{};
 	};
 
-
-
 	struct CPU
 	{
 	public:
@@ -710,11 +735,21 @@ namespace x69::emu
 
 		enum class CPU_BASIC_OPS : word_type
 		{
-			JMP = 0b00,
-			CALL = 0b01,
-			RJMP = 0b10,
-			RCALL = 0b11
+			JMP		= 0b00,
+			CALL	= 0b01,
+			RJMP	= 0b10,
+			RCALL	= 0b11
 		};
+
+		enum class CPU_GENERAL_OPS : word_type
+		{
+			RET		= 0b0000,
+			DNFG	= 0b0001,
+			ENFG	= 0b0010,
+			PUSH	= 0b0011,
+			POP		= 0b0100
+		};
+
 
 	private:
 
@@ -729,6 +764,13 @@ namespace x69::emu
 				((Memory::address_type)_ins.dbyte | ((Memory::address_type)*_ins.ebyte << 8)) :
 				((Memory::address_type)this->registers()[_ins.dbyte & 0x0F] | ((Memory::address_type)this->registers()[(_ins.dbyte & 0xF0) >> 4] << 8));
 
+			Memory::address_type _lrMayBe = this->special_regs()[SpecialRegisters::PC].val_;
+			_lrMayBe += 2;
+			if (_ins.ebyte)
+			{
+				++_lrMayBe;
+			};
+
 			// Determine instruction and preform it
 			switch (_ins.ibyte & 0b00000011)
 			{
@@ -742,12 +784,12 @@ namespace x69::emu
 				break;
 			case (word_type)CPU_BASIC_OPS::CALL:
 				this->pc_lock_ = true;
-				this->special_regs()[SpecialRegisters::LR] = this->special_regs()[SpecialRegisters::PC];
+				this->special_regs()[SpecialRegisters::LR] = _lrMayBe;
 				this->special_regs()[SpecialRegisters::PC] = _address;
 				break;
 			case (word_type)CPU_BASIC_OPS::RCALL:
 				this->pc_lock_ = true;
-				this->special_regs()[SpecialRegisters::LR] = this->special_regs()[SpecialRegisters::PC];
+				this->special_regs()[SpecialRegisters::LR] = _lrMayBe;
 				this->special_regs()[SpecialRegisters::PC] += _address;
 				break;
 			default:
@@ -771,7 +813,7 @@ namespace x69::emu
 				ALUFlags::FLAGS _flag = (ALUFlags::FLAGS)(0x1 << _flagCode);
 
 				// Get not or regular bit
-				bool _invertState = (_ins.ibyte & 0xb00010000) != 0;
+				bool _invertState = (_ins.ibyte & 0b00010000) != 0;
 
 				// Check condition 
 				bool _conditionMet = (_invertState ^ this->alu_flags_.get(_flag));
@@ -784,7 +826,53 @@ namespace x69::emu
 			}
 			else if ((_ins.ibyte & bit_masks::CPU_RESERVED_OP) != 0)
 			{
-				// Reserved
+				// General CPU OP
+
+				// Mask to get the relevant op code bits
+				word_type _ibits = _ins.ibyte & 0b00001111;
+
+				// Grab registers provided if needed
+				word_type _regNum = (_ins.dbyte & 0x0F);
+				auto& _reg = this->registers()[_regNum];
+
+				// Handle op
+				switch (_ibits)
+				{
+				case (word_type)CPU_GENERAL_OPS::RET:
+					this->pc_lock_ = true;
+					this->special_regs()[SpecialRegisters::PC] = this->special_regs()[SpecialRegisters::LR];
+					break;
+				case (word_type)CPU_GENERAL_OPS::DNFG:
+					this->alu_flags_.lock();
+					break; 
+				case (word_type)CPU_GENERAL_OPS::ENFG:
+					this->alu_flags_.unlock();
+					break;
+
+				/*
+					Stack grows from the top down
+				*/
+				case (word_type)CPU_GENERAL_OPS::PUSH:
+					this->direct_memory()->write(this->special_regs()[SpecialRegisters::SP], _reg);
+					--this->special_regs()[SpecialRegisters::SP];
+					break;
+				case (word_type)CPU_GENERAL_OPS::POP:
+					_reg = this->direct_memory()->read(this->special_regs()[SpecialRegisters::SP]);
+					++this->special_regs()[SpecialRegisters::SP];
+					break;
+
+
+
+				default:
+					// non op
+					abort();
+					break;
+				};
+				
+
+
+
+
 
 			}
 			else if ((_ins.ibyte & bit_masks::CPU_SPECIAL_REGISTERS_OP) != 0)
@@ -794,7 +882,7 @@ namespace x69::emu
 				// false = read
 				// true = write
 				bool _readOrWrite = _ins.ibyte & 0b00000100;
-				uint8_t _sregCode = _ins.ibyte & 0b00000011;
+				word_type _sregCode = _ins.ibyte & 0b00000011;
 
 				auto _regName = (SpecialRegisters::REGISTERS)_sregCode;
 				auto* _sreg = &this->special_regs()[_regName];
@@ -858,14 +946,13 @@ namespace x69::emu
 			MVN = 0x18,
 			SET = 0x09,
 			STN = 0x19,
-			CMP = 0x0A,
-			MAX_USED_VALUE = CMP
+			CMP = 0x0A
 		};
 
 		void handle_alureg_op(Instruction _ins)
 		{
 			uint8_t _opBits = _ins.ibyte & 0x1F;
-			assert(_opBits <= (uint8_t)ALU_OPS::MAX_USED_VALUE);
+			//assert(_opBits <= (uint8_t)ALU_OPS::MAX_USED_VALUE);
 
 			ALU_OPS _op = (ALU_OPS)_opBits;
 
@@ -947,14 +1034,14 @@ namespace x69::emu
 			case ALU_OPS::SBC:
 				if (_flags.get(ALUFlags::C))
 				{
-					this->alu_flags_.set_to(ALUFlags::C, (_a + twos(_b)) < twos(_b));
-					this->alu_flags_.set_to(ALUFlags::T, _a >= _b);
+					this->alu_flags_.set_to(ALUFlags::C, (_a + twos(_b + 1)) < twos(_b + 1));
+					this->alu_flags_.set_to(ALUFlags::T, _a == (_b + 1));
 					_rb = _a + twos(_b + 1);
 				}
 				else
 				{
 					this->alu_flags_.set_to(ALUFlags::C, (_a + twos(_b)) < twos(_b));
-					this->alu_flags_.set_to(ALUFlags::T, _a >= _b);
+					this->alu_flags_.set_to(ALUFlags::T, _a == _b);
 					_rb = _a + twos(_b);
 				};
 				this->alu_flags_.set_to(ALUFlags::Z, _rb == 0);
@@ -966,7 +1053,7 @@ namespace x69::emu
 				break;
 			case ALU_OPS::DEC:
 				this->alu_flags_.set_to(ALUFlags::C, _b == std::numeric_limits<word_type>::min());
-				_rb = _b + twos((word_type)0x1);
+				_rb = _b - 1;
 				this->alu_flags_.set_to(ALUFlags::Z, _rb == 0);
 				break;
 			case ALU_OPS::MOV:
@@ -988,10 +1075,10 @@ namespace x69::emu
 			case ALU_OPS::CMP:
 				this->alu_flags_.set_to(ALUFlags::C, (_a + twos(_b)) < twos(_b));
 				this->alu_flags_.set_to(ALUFlags::T, _a >= _b);
-				this->alu_flags_.set_to(ALUFlags::Z, (_a + twos(_b)) == 0);
+				this->alu_flags_.set_to(ALUFlags::Z, _a == _b);
 				break;
 			default:
-				abort();
+				abort(); 
 			};
 
 		};
@@ -1011,6 +1098,12 @@ namespace x69::emu
 
 			// Grab address
 			auto _address = this->special_regs()[SpecialRegisters::ADDR].val_;
+
+			// If an extra byte was provided, it is to be used as an offset
+			if (_ins.ebyte)
+			{
+				_address += *_ins.ebyte;
+			};
 
 			// Preform operation
 			if (_readOrWrite)
@@ -1044,6 +1137,7 @@ namespace x69::emu
 
 			return _ins;
 		};
+
 
 	public:
 
@@ -1092,8 +1186,7 @@ namespace x69::emu
 
 	};
 
-
-	std::vector<uint8_t> load_x69_machine_code(const std::filesystem::path& _path);
+	std::optional<std::vector<uint8_t>> load_x69_machine_code(const std::filesystem::path& _path);
 
 
 }
