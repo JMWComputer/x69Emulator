@@ -4,6 +4,14 @@
 
 namespace x69::emu::tv
 {
+	AssemblyEditor::AssemblyEditor(const TRect& _bounds, TScrollBar* _aHScrollBar,
+		TScrollBar* _aVScrollBar, TIndicator* _indicator, const char* _filePath) :
+		TFileEditor{ _bounds, _aHScrollBar, _aVScrollBar, _indicator, _filePath }
+	{};
+}
+
+namespace x69::emu::tv
+{
 
 	void AssemblyEditorWindow::save_and_run()
 	{
@@ -57,6 +65,11 @@ namespace x69::emu::tv
 		return;
 	};
 
+
+
+
+
+
 	AssemblyEditorWindow::AssemblyEditorWindow(const TRect& _r, const char* _fileName, short _anum, Terminal* _terminal) :
 		TWindow{ _r, _fileName, _anum },
 		TWindowInit{ &AssemblyEditorWindow::initFrame },
@@ -109,10 +122,6 @@ namespace x69::emu::tv
 
 	};
 
-	AssemblyEditor::AssemblyEditor(const TRect& _bounds, TScrollBar* _aHScrollBar,
-		TScrollBar* _aVScrollBar, TIndicator* _indicator, const char* _filePath) :
-		TFileEditor{ _bounds, _aHScrollBar, _aVScrollBar, _indicator, _filePath }
-	{};
 
 
 	

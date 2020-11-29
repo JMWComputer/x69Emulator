@@ -6,8 +6,88 @@
 namespace x69::emu
 {
 
+	std::optional<PeripheralLayout> parse_peripherals_file(const std::filesystem::path& _path)
+	{
+		namespace fs = std::filesystem;
+		if (!fs::exists(_path))
+		{
+			return std::nullopt;
+		};
+
+		std::ifstream _ifstr{ _path };
+		if (!_ifstr.is_open())
+		{
+			return std::nullopt;
+		};
+
+		PeripheralLayout _out{};
+
+		std::string _libPath{};
+		std::string _address{};
+
+		while (!_ifstr.eof())
+		{
+			std::getline(_ifstr, _libPath, ':');
+
+			if (_ifstr.eof())
+			{
+				break;
+			};
+
+			while (std::isspace(_ifstr.peek()))
+			{
+				_ifstr.ignore();
+			};
+
+			std::getline(_ifstr, _address, '\n');
+
+			_out.peripherals.push_back(PeripheralLayout::periph{ _libPath, (uint16_t)std::stoi(_address, 0, 16) });
+
+			_libPath.clear();
+			_address.clear();
+
+		};
+
+		return _out;
+	};
+
 }
 
+
+
+namespace x69::emu
+{
+
+	void Memory::set_vmem_range(std::pair<address_type, address_type> _range)
+	{
+		this->vmem_bottom_ = _range.first;
+		this->vmem_top_ = _range.second;
+	};
+
+	bool Memory::allow_vmemop(address_type _addr) const
+	{
+		return (_addr + this->vmem_bottom_ >= this->vmem_bottom_ && _addr + this->vmem_bottom_ < this->vmem_top_);
+	};
+
+	Memory::word_type Memory::vread(address_type _addr)
+	{
+		return (this->allow_vmemop(_addr))? this->read(_addr + this->vmem_bottom_) : 0x00;
+	};
+
+	void Memory::vwrite(address_type _addr, word_type _val)
+	{
+		if (this->allow_vmemop(_addr))
+		{
+			this->write(_addr + this->vmem_bottom_, _val);
+		};
+	};
+	
+	std::pair<Memory::address_type, Memory::address_type> Memory::get_vmem_range() const noexcept
+	{
+		return { this->vmem_bottom_, this->vmem_top_ };
+	};
+
+}
 
 
 namespace x69::emu

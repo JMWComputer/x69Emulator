@@ -20,6 +20,7 @@ set_target_properties(${PROJECT_NAME} PROPERTIES CXX_STANDARD 20 CXX_STANDARD_RE
 target_compile_definitions(${PROJECT_NAME} PRIVATE -DSOURCE_ROOT="${CMAKE_CURRENT_LIST_DIR}/" -DENVIRONMENT_ROOT="./")
 
 add_subdirectory("terminal")
+add_subdirectory("peripherals")
 
 install(TARGETS ${PROJECT_NAME}Lib DESTINATION "${CMAKE_INSTALL_PREFIX}/lib")
 install(FILES "include/${PROJECT_NAME}Lib.h" DESTINATION "${CMAKE_INSTALL_PREFIX}include")

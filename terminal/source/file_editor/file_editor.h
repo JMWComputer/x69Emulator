@@ -5,10 +5,12 @@
 #define Uses_TIndicator
 #define Uses_TWindow
 #define Uses_TButton
+#define Uses_TKeys
+#define Uses_TEvent
 
+#include "Colors.h"
 
 #include <tvision/tv.h>
-
 
 namespace x69::emu
 {
@@ -17,7 +19,6 @@ namespace x69::emu
 
 namespace x69::emu::tv
 {
-	
 
 
 	class AssemblyEditor : public TFileEditor
@@ -34,6 +35,8 @@ namespace x69::emu::tv
 	public:
 		void handleEvent(TEvent& _event) override;
 		void draw() override;
+
+		constexpr static inline int cmSaveAndRun = 103;
 
 		AssemblyEditorWindow(const TRect& _r, const char* _fileName, short _anum, Terminal* _terminal);
 

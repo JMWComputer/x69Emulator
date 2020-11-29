@@ -20,10 +20,26 @@
 
 namespace em = x69::emu;
 
-void load_periphs(em::Memory* _mem)
+
+em::TerminalPeriphal term_pf_{};
+
+uint8_t __cdecl term_pf_size()
 {
-	std::unique_ptr<em::TerminalPeriphal> _tmnl{ new em::TerminalPeriphal{} };
-	_mem->register_peripheral(std::move(_tmnl));
+	return term_pf_.size();
+};
+uint8_t __cdecl term_pf_read(uint8_t _offset)
+{
+	return term_pf_.read(_offset);
+};
+void __cdecl term_pf_write(uint8_t _offset, uint8_t _val)
+{
+	term_pf_.write(_offset, _val);
+};
+
+void load_terminal_pf(em::Memory* _mem)
+{
+	em::x69Peripheral x69TERMINAL_PERIPHERAL{ NULL, &term_pf_size, &term_pf_read, &term_pf_write };
+	_mem->register_peripheral(std::move(x69TERMINAL_PERIPHERAL), 0xF000);
 };
 
 
@@ -489,14 +505,34 @@ void run_emulator(Emulator* _emu)
 
 
 
-
 };
+
+
 
 int imain(int argc, char* argv[], char* envp[])
 {
 	Emulator emu_{};
+	load_terminal_pf(&emu_.memory());
 
-	emu_.ecpu().direct_memory()->register_peripheral(std::unique_ptr<em::TerminalPeriphal>{ new em::TerminalPeriphal{} });
+	auto _gotPeriphs = x69::emu::parse_peripherals_file("pflayout.txt");
+	if (!_gotPeriphs)
+	{
+		return -2;
+	};
+
+	for (auto& _p : _gotPeriphs->peripherals)
+	{
+		auto _pf = x69::emu::open_peripheral_lib(_p.path);
+		if (_pf)
+		{
+			emu_.memory().register_peripheral(std::move(*_pf), _p.address);
+		}
+		else
+		{
+			std::cout << "Failed to load peripheral : " << _p.path << '\n';
+		};
+
+	};
 
 	auto _goodOpen = emu_.terminal().open();
 	if (!_goodOpen)

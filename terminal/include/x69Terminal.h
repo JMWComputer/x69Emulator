@@ -10,7 +10,9 @@
 #include <mutex>
 #include <istream>
 #include <ostream>
+#include <concepts>
 #include <filesystem>
+#include <type_traits>
 
 namespace x69::emu::peripheral::terminal
 {
@@ -142,6 +144,8 @@ namespace x69::emu
 		void ignore_message() noexcept;
 		void clear_messages() noexcept;
 
+		std::istream ein;
+		std::ostream eout;
 
 		int thread_main();
 
@@ -159,9 +163,6 @@ namespace x69::emu
 		~Terminal();
 
 	private:
-
-		std::istream ein_;
-		std::ostream eout_;
 
 		mutable std::mutex msg_queue_mtx_;
 		std::queue<Message> msg_queue_;

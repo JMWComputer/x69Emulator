@@ -11,6 +11,14 @@
 #include <fstream>
 #include <filesystem>
 #include <string>
+#include <optional>
+
+namespace x69::emu
+{
+	constexpr static inline auto x69Peripheral_Write_Name = "x69_peripheral_write";
+	constexpr static inline auto x69Peripheral_Read_Name = "x69_peripheral_read";
+	constexpr static inline auto x69Peripheral_Size_Name = "x69_peripheral_size";
+}
 
 #if defined(WIN32) || defined(_WIN32) || defined(_WIN32_) || defined(_NT_)
 
@@ -18,6 +26,91 @@
 
 #undef min
 #undef max
+
+namespace x69::emu
+{
+	using x69Peripheral_Write = void(__cdecl*)(uint8_t, uint8_t);
+	using x69Peripheral_Read = uint8_t(__cdecl*)(uint8_t);
+	using x69Peripheral_Size = uint8_t(__cdecl*)();
+
+	struct x69Peripheral
+	{
+	public:
+		bool is_valid() const noexcept { return this->size_ != NULL && this->write_ != NULL && this->read_ != NULL; };
+
+		uint8_t size() const { return (*this->size_)(); };
+		uint8_t read(uint8_t _offset) const { return (*this->read_)(_offset); };
+		void write(uint8_t _offset, uint8_t _val) const { (*this->write_)(_offset, _val); };
+
+		x69Peripheral(HINSTANCE _ins, x69Peripheral_Size _size, x69Peripheral_Read _read, x69Peripheral_Write _write) : 
+			hinst_lib_{ _ins }, size_{ _size }, read_{ _read }, write_{ _write }
+		{};
+
+		x69Peripheral(x69Peripheral&& other) noexcept : 
+			hinst_lib_{ std::exchange(other.hinst_lib_, HINSTANCE{}) },
+			size_{ other.size_ }, read_{ other.read_ }, write_{ other.write_ }
+		{};
+		x69Peripheral& operator=(x69Peripheral&& other) noexcept
+		{
+			this->hinst_lib_ = std::exchange(other.hinst_lib_, HINSTANCE{});
+			this->size_ = other.size_;
+			this->read_ = other.read_;
+			this->write_ = other.write_;
+			return *this;
+		};
+
+		~x69Peripheral()
+		{
+			if (this->hinst_lib_ != NULL)
+			{
+				auto _fres = FreeLibrary(this->hinst_lib_);
+			};
+		};
+
+	private:
+		x69Peripheral_Size size_ = nullptr;
+		x69Peripheral_Read read_ = nullptr;
+		x69Peripheral_Write write_ = nullptr;
+
+		HINSTANCE hinst_lib_;
+
+
+	};
+
+
+
+	static std::optional<x69Peripheral> open_peripheral_lib(const std::filesystem::path& _path)
+	{
+		
+		BOOL _fRunTimeLinkSuccess = FALSE;
+
+		// Get a handle to the DLL module
+
+		auto _hintLib = LoadLibrary(TEXT(_path.string().c_str()));
+
+		// If the handle is valid, try to get the function address
+
+		if (_hintLib != NULL)
+		{
+			auto _size = (x69Peripheral_Size)GetProcAddress(_hintLib, x69Peripheral_Size_Name);
+			auto _read = (x69Peripheral_Read)GetProcAddress(_hintLib, x69Peripheral_Read_Name);
+			auto _write = (x69Peripheral_Write)GetProcAddress(_hintLib, x69Peripheral_Write_Name);
+
+			return x69Peripheral{ _hintLib, _size, _read, _write };
+		};
+
+		// If unable to call the DLL function, use an alternative.
+		return std::nullopt;
+
+	};
+
+};
+
+#undef max
+#undef min
+
+
+
 
 #pragma region ANSI_CONSTANTS
 
@@ -108,8 +201,42 @@ namespace x69::emu
 
 #endif
 
+
+
+
+
+
+
 namespace x69::emu
 {
+
+	struct PrivilegeFlag
+	{
+	public:
+		bool check() const noexcept { return this->os_mode_flag_; };
+		explicit operator bool() const noexcept { return this->check(); };
+
+		void set() noexcept { this->os_mode_flag_ = true; };
+		void clear() noexcept { this->os_mode_flag_ = false; };
+
+
+
+	private:
+		bool os_mode_flag_ = true;
+	};
+
+	struct PeripheralLayout
+	{
+		struct periph
+		{
+			std::filesystem::path path;
+			uint16_t address;
+		};
+		std::vector<periph> peripherals{};
+	};
+
+	std::optional<PeripheralLayout> parse_peripherals_file(const std::filesystem::path& _path);
+
 
 
 	template <typename T>
@@ -186,10 +313,6 @@ namespace x69::emu
 		static inline constexpr auto green = color_t<COLORS::GREEN>{};
 
 	};
-
-
-
-
 
 	template <typename T>
 	struct Register
@@ -588,9 +711,10 @@ namespace x69::emu
 
 	};
 
-	
-
-	struct Memory
+	/**
+	 * @brief Holds the memory for the emulator, this is the direct memory and is not persistant
+	*/
+	class Memory
 	{
 	public:
 		using cpu_traits = CPUVersionTraits;
@@ -602,13 +726,15 @@ namespace x69::emu
 
 		struct Periph
 		{
-			auto operator->() const noexcept { return this->ptr.get(); };
+			uint8_t size() const { return this->pf.size(); };
+			uint8_t read(uint8_t _offset) const { return this->pf.read(_offset); };
+			void write(uint8_t _offset, uint8_t _val) { this->pf.write(_offset, _val); };
 
-			std::unique_ptr<PeripheralAPI> ptr;
+			x69Peripheral pf;
 			address_type base_address;
 
-			Periph(std::unique_ptr<PeripheralAPI> _ptr, address_type _baseAddress) :
-				ptr{ std::move(_ptr) }, base_address{ _baseAddress }
+			Periph(x69Peripheral _pf, address_type _baseAddress) :
+				pf{ std::move(_pf) }, base_address{ _baseAddress }
 			{};
 		};
 
@@ -640,7 +766,7 @@ namespace x69::emu
 		{
 			for (auto& p : this->peripherals_)
 			{
-				if (_addr >= p.base_address && _addr < p.base_address + p->size())
+				if (_addr >= p.base_address && _addr < p.base_address + p.size())
 				{
 					return &p;
 				};
@@ -651,7 +777,7 @@ namespace x69::emu
 		{
 			for (auto& p : this->peripherals_)
 			{
-				if (_addr >= p.base_address && _addr < p.base_address + p->size())
+				if (_addr >= p.base_address && _addr < p.base_address + p.size())
 				{
 					return &p;
 				};
@@ -666,19 +792,25 @@ namespace x69::emu
 			auto _p = this->find_periph(_addr);
 			if (_p)
 			{
-				return (*_p)->read(_addr - _p->base_address);
+				return _p->read(_addr - _p->base_address);
 			}
 			else
 			{
 				return this->data_.at(_addr);
 			};
 		};
+		
+		/**
+		 * @brief Preforms a raw write to memory
+		 * @param _addr Address to write to
+		 * @param _data Value to write
+		*/
 		void write(address_type _addr, word_type _data) noexcept
 		{
 			auto _p = this->find_periph(_addr);
 			if (_p)
 			{
-				return (*_p)->write(_addr - _p->base_address, _data);
+				return _p->write(_addr - _p->base_address , _data);
 			}
 			else
 			{
@@ -686,19 +818,52 @@ namespace x69::emu
 			};
 		};
 
-		void register_peripheral(std::unique_ptr<PeripheralAPI> _ptr)
+		/**
+		 * @brief Checks if a address can be used in virtual read/write
+		 * @param _addr Address to check
+		 * @return true if allowed
+		*/
+		bool allow_vmemop(address_type _addr) const;
+		
+		/**
+		 * @brief Preform virtual memory write, will disallow reading from outside the address range
+		 * @param _addr Address to write to (un-adjusted for vmem)
+		 * @param _val Value to write
+		*/
+		word_type vread(address_type _addr);
+		
+		/**
+		 * @brief Preform virtual memory write, will prevent writing to outside the address range
+		 * @param _addr Address to write to (un-adjusted for vmem)
+		 * @param _val Value to write
+		*/
+		void vwrite(address_type _addr, word_type _val);
+
+		/**
+		 * @brief Registers a peripheral at the address provided.
+		 * @param _pf Peripheral data
+		 * @param _baseAddress Peripheral base address
+		*/
+		void register_peripheral(x69Peripheral _pf, uint16_t _baseAddress)
 		{
-			Periph _p{ std::move(_ptr), this->paddr_end_ };
-			this->paddr_end_ += _p->size();
+			Periph _p{ std::move(_pf), _baseAddress };
 			this->peripherals_.push_back(std::move(_p));
 		};
+
+		void set_vmem_range(std::pair<address_type, address_type> _range);
+
+		std::pair<address_type, address_type> get_vmem_range() const noexcept;
 
 	private:
 		address_type paddr_end_ = 0xF000;
 
+		address_type vmem_bottom_{ 0x1000 };
+		address_type vmem_top_{ 0x1000 };
+
 		std::vector<Periph> peripherals_{};
 
 		ContainerT data_{};
+
 	};
 
 	struct CPU
@@ -711,7 +876,8 @@ namespace x69::emu
 		SpecialRegisters sregs_{};
 		CPURegisters registers_{};
 		ALUFlags alu_flags_{};
-		Memory* direct_mem_ = nullptr;
+		Memory* direct_mem_ = nullptr; 
+		PrivilegeFlag privs_{};
 
 		bool pc_lock_ = false;
 
@@ -757,6 +923,8 @@ namespace x69::emu
 		{
 			// Basic CPU op
 
+
+
 				// Build memory address
 				// If no extra byte is provided, load in the two registers provided by the dbyte
 				// If an extra byte is provided, build the address by concating the dbyte(lower byte) and ebyte(upper byte)
@@ -798,6 +966,14 @@ namespace x69::emu
 			};
 
 		};
+
+		Memory::address_type form_address(const Instruction& _ins) const noexcept
+		{
+			return (_ins.ebyte) ?
+				((Memory::address_type)_ins.dbyte | ((Memory::address_type)*_ins.ebyte << 8)) :
+				((Memory::address_type)this->registers()[_ins.dbyte & 0x0F] | ((Memory::address_type)this->registers()[(_ins.dbyte & 0xF0) >> 4] << 8));
+		};
+
 
 	protected:
 
@@ -890,9 +1066,7 @@ namespace x69::emu
 				if (_readOrWrite)
 				{
 					// Write
-					Memory::address_type _val = (_ins.ebyte) ?
-						((Memory::address_type)_ins.dbyte | ((Memory::address_type)*_ins.ebyte << 8)) :
-						((Memory::address_type)this->registers()[_ins.dbyte & 0x0F] | ((Memory::address_type)this->registers()[(_ins.dbyte & 0xF0) >> 4] << 8));
+					Memory::address_type _val = this->form_address(_ins);
 					_sreg->val_ = _val;
 
 					if (_regName == SpecialRegisters::PC)
@@ -1109,19 +1283,75 @@ namespace x69::emu
 			if (_readOrWrite)
 			{
 				// Write register to memory
-				this->direct_memory()->write(_address, _reg);
+				if (this->privs_.check())
+				{
+					this->direct_memory()->write(_address, _reg);
+				}
+				else
+				{
+					this->direct_memory()->vwrite(_address, _reg);
+				};
 			}
 			else
-			{
-				// Read value from memory into register
-				_reg = this->direct_memory()->read(_address);
+			{// Write register to memory
+				if (this->privs_.check())
+				{
+					_reg.val_ = this->direct_memory()->read(_address);
+				}
+				else
+				{
+					_reg.val_ = this->direct_memory()->vread(_address);
+				};
+
 			};
 
 		};
 
+		enum class PRIV_OPS : uint8_t
+		{
+			CLEAR_FLAG = 0,
+			SET_FLAG,
+			SET_VMEM_BOTTOM,
+			SET_VMEM_TOP,
+		};
+
 		void handle_privs_op(Instruction _ins)
 		{
+			if ((_ins.ibyte & 0x07) == (uint8_t)PRIV_OPS::CLEAR_FLAG)
+			{
+				if (this->privs_.check())
+				{
+					this->privs_.clear();
+				};
+			}
+			else if ((_ins.ibyte & 0x07) == (uint8_t)PRIV_OPS::SET_FLAG)
+			{
+				if (this->privs_.check())
+				{
+					this->privs_.set();
+				};
+			}
+			else if ((_ins.ibyte & 0x07) == (uint8_t)PRIV_OPS::SET_VMEM_BOTTOM)
+			{
+				auto _addr = this->form_address(_ins);
+				if (this->privs_)
+				{
+					auto _range = this->direct_memory()->get_vmem_range();
+					_range.first = _addr;
+					this->direct_mem_->set_vmem_range(_range);
+				};
+			}
+			else if ((_ins.ibyte & 0x07) == (uint8_t)PRIV_OPS::SET_VMEM_TOP)
+			{
+				auto _addr = this->form_address(_ins);
 
+				if (this->privs_)
+				{
+					auto _range = this->direct_memory()->get_vmem_range();
+					_range.second = _addr;
+					this->direct_mem_->set_vmem_range(_range);
+				};
+			};
 		};
 
 		Instruction fetch_next_instruction()

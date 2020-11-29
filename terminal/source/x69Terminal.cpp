@@ -25,6 +25,16 @@
 #define Uses_TRect
 #define Uses_TPalette
 
+#include "Colors.h"
+
+#include "file_editor/file_editor.h"
+#include "terminal_view/terminal_view.h"
+#include "register_view/register_view.h"
+#include "file_view/file_view.h"
+#include "shell/shell.h"
+
+#include "RealTime.h"
+
 #include <tvision/tv.h>
 
 #include <chrono>
@@ -33,297 +43,101 @@
 #include <fstream>
 #include <cassert>
 
-#define EMULATOR_PALLETE_COLOR "\x9\xA\xB\xC\xD\xE"
-
-
+namespace etv = x69::emu::tv;
 
 const int cmOpenRegisters = 100;
 const int cmOpenTerminal = 101;
-const int cmOpenCommandLine = 102;
-
-const int cmSaveAndRun = 103;
+const int cmOpenShell = 102;
+const int cmOpenAll = 103;
+const int cmOpenIDE = 104;
 
 static inline short winNumber = 0;
 
 using EMUTerminal = x69::emu::Terminal;
 
 
-
-
-struct RegisterValues
+struct IDEWindow : public TWindow
 {
-	uint8_t regs[16]{};
-	uint16_t pc = 0;
-	uint16_t lr = 0;
-	uint16_t sp = 0;
-	uint16_t addr = 0;
-};
-static inline RegisterValues register_vals{};
-
-struct RegisterPrintout : public TView
-{
-private:
-	static inline RegisterPrintout* active_ = nullptr;
-
-public:
-	static bool has_active() noexcept { return active_ != nullptr; };
-	static auto get_active() noexcept { return active_; };
-
-	RegisterPrintout(TRect _bounds) :
-		TView{ _bounds }
-	{
-		this->growMode = gfGrowHiX | gfGrowHiY;
-		this->options = options | ofFramed;
-
-		active_ = this;
-
-	};
-	virtual void draw();
-
-	~RegisterPrintout()
-	{
-		if (active_ == this)
-		{
-			active_ = nullptr;
-		};
-	};
-};
-struct RegistersWindow : public TWindow
-{
-	RegistersWindow(const TRect& _r, const char* _title, short _num) :
-		TWindow{ _r, _title, _num },
-		TWindowInit{ &RegistersWindow::initFrame }
-	{
-		TRect _clipr = getClipRect();
-		_clipr.grow(-1, -1);
-		this->insert(new RegisterPrintout{ _clipr }); 
-	};
-};
-
-void RegisterPrintout::draw()
-{
-	auto _color = getColor(0x0301);
-	TView::draw();
-	TDrawBuffer _b;
-	std::string _printLine{};
-	int _rcounter = 0;
-
-	std::stringstream _sstr{};
-
-	for (auto& _regVal : register_vals.regs)
-	{
-		_sstr.str("");
-		_sstr << "r" << std::dec << _rcounter << " : " << std::hex << (int)_regVal;
-		_printLine = _sstr.str();
-		_b.moveStr(0, _printLine, _color);
-		writeLine(2, _rcounter++, _printLine.size(), 1, _b);
-
-	};
-
-	_sstr.str("");
-	_sstr << "pc : " << std::hex << register_vals.pc;
-	_printLine = _sstr.str();
-	_b.moveStr(0, _printLine, _color);
-	writeLine(2, ++_rcounter, _printLine.size(), 1, _b);
-
-	_sstr.str("");
-	_sstr << "lr : " << std::hex << register_vals.lr;
-	_printLine = _sstr.str();
-	_b.moveStr(0, _printLine, _color);
-	writeLine(2, ++_rcounter, _printLine.size(), 1, _b);
-
-	_sstr.str("");
-	_sstr << "sp : " << std::hex << register_vals.sp;
-	_printLine = _sstr.str();
-	_b.moveStr(0, _printLine, _color);
-	writeLine(2, ++_rcounter, _printLine.size(), 1, _b);
-
-	_sstr.str("");
-	_sstr << "adr : " << std::hex << register_vals.addr;
-	_printLine = _sstr.str();
-	_b.moveStr(0, _printLine, _color);
-	writeLine(2, ++_rcounter, _printLine.size(), 1, _b);
-
-};
-
-
-struct TerminalValues
-{
-	uint8_t width = 0;
-	uint8_t height = 0;
-	std::vector<char> data{};
-};
-static inline TerminalValues terminal_vals{};
-
-struct TerminalPrintout : public TView
-{
-private:
-	static inline TerminalPrintout* active_terminal_ = nullptr;
-
 public:
 
-	static bool has_active() noexcept { return active_terminal_ != nullptr; };
-	static auto get_active() noexcept { return active_terminal_; };
-
-	TerminalPrintout(TRect _bounds) :
-		TView{ _bounds }
+	void edit_file(const std::string& _filePath)
 	{
-		this->growMode = gfGrowHiX | gfGrowHiY;
-		this->options = options | ofFramed;
-		active_terminal_ = this;
-	};
+		auto _r = this->getClipRect();
+		_r.grow(-1, -1);
 
-	virtual void draw()
-	{
-		auto _color = getColor(0x0301);
-		TView::draw();
-		TDrawBuffer _b;
-		std::string _printLine{};
-		int _y = 0;
-		for (auto it = terminal_vals.data.begin(); it < terminal_vals.data.end(); it += terminal_vals.width)
+		std::filesystem::path _fp{ _filePath };
+		if (!_fp.has_extension())
 		{
-			_printLine.assign(it, it + terminal_vals.width);
-			_b.moveStr(0, _printLine, _color);
-			writeLine(0, _y++, _printLine.size(), 1, _b);
+			this->current_dir_.append("./" + _filePath);
+			this->file_list_->readDirectory(_filePath.c_str(), "*");
+			this->file_list_->draw();
+		}
+		else
+		{
+
+			_r.b.x = this->file_list_->getBounds().a.x - 5;
+			this->vscroll_ = new TScrollBar{ { _r.b.x + 1, _r.a.y, _r.b.x + 2, _r.b.y } };		
+			this->insert(this->vscroll_);
+
+			this->hscroll_ = new TScrollBar{ { _r.a.x, _r.b.y - 1, _r.b.x + 3, _r.b.y } };
+			this->insert(this->hscroll_);
+			_r.b.y -= 2;
+
+			this->asm_editor_ = new x69::emu::tv::AssemblyEditor(_r, this->hscroll_, this->vscroll_, nullptr, _filePath.c_str());
+			this->insert(this->asm_editor_);
+
 		};
+
 	};
 
-	~TerminalPrintout()
+	void handleEvent(TEvent& _event) override
 	{
-		if (active_terminal_ == this)
-			active_terminal_ = nullptr;
+		TPoint _temp{};
+		TWindow::handleEvent(_event);
+		if (_event.what == evBroadcast)
+		{
+			char _buff[128]{};
+			switch (_event.message.command)
+			{
+			case cmFileDoubleClicked:
+				this->file_list_->getText(_buff, this->file_list_->cursor.y, sizeof(_buff) - 1);
+				this->edit_file(_buff);
+				clearEvent(_event);
+				break;
+			default:
+				break;
+			};
+		};
+
 	};
-};
-struct TerminalWindow : public TWindow
-{
-	TerminalWindow(const TRect& _r, const char* _title, short _num) :
-		TWindow{ _r, _title, _num },
-		TWindowInit{ &RegistersWindow::initFrame }
+
+	IDEWindow(const TRect& _r, const char* _fileName, short _anum, const std::string& _currentDir = "./") :
+		TWindow{ _r, _fileName, _anum },
+		TWindowInit{ &IDEWindow::initFrame }, current_dir_{ _currentDir }
 	{
-		TRect _clipr = getClipRect();
-		_clipr.grow(-1, -1);
-		this->insert(new TerminalPrintout{ _clipr });
+
+		auto _rec = this->getBounds();
+		_rec.a.x = _rec.b.x - 32;
+		_rec.a.y += 4;
+		_rec.b.y -= 4;
+		_rec.b.x -= 1;
+		this->file_list_ = new x69::emu::tv::FileViewer{ _rec, _currentDir.c_str() };
+		this->file_list_->readDirectory(this->current_dir_.string().c_str(), "*");
+		this->insert(this->file_list_);
 	};
-};
-
-
-struct CommandLineWindow : TWindow
-{
-	struct CommandLineData
-	{
-		char inputLineData[128]{};
-	};
-
-	CommandLineWindow(const TRect& _r, const char* _title, short _num, EMUTerminal* _terminal) :
-		TWindow{ _r, _title, _num },
-		TWindowInit{ &CommandLineWindow::initFrame },
-		terminal_{ _terminal }
-	{
-		
-		TRect _thisRect = getClipRect();
-
-		unsigned _inLineWidth = (unsigned)((_thisRect.b.x - 2) - (_thisRect.a.x + 2));
-		TRect _inLineRect{ _thisRect.a.x + 2, _thisRect.b.y - 2, _thisRect.b.x - 2, _thisRect.b.y - 1 };
-
-		TRect _inLineLabelRect = _inLineRect;
-		_inLineLabelRect.b.x = _inLineLabelRect.a.x + 3;
-		_inLineRect.a.x += 3;
-
-		this->input_line_ = new TInputLine{ _inLineRect, _inLineWidth };
-		this->insert(this->input_line_);
-
-		this->insert(new TLabel(_inLineLabelRect, "$: ", this->input_line_));
-
-		this->input_line_->setState(sfSelected, false);
-
-	};
-
-	void handleEvent(TEvent& _event) override;
-
-	void disable_input_line();
-	void enable_input_line();
-
-	void clear_user_input();
 
 private:
-	void got_user_input();
 
-	EMUTerminal* terminal_ = nullptr;
-	TInputLine* input_line_ = nullptr;
+	std::filesystem::path current_dir_ = "";
 
-	bool allow_input_ = false;
+	x69::emu::tv::FileViewer* file_list_ = nullptr;
+
+	TScrollBar* hscroll_ = nullptr;
+	TScrollBar* vscroll_ = nullptr;
+	x69::emu::tv::AssemblyEditor* asm_editor_ = nullptr;
+
 
 };
-
-void CommandLineWindow::disable_input_line()
-{
-	this->allow_input_ = false;
-	this->clear_user_input();
-	this->input_line_->hideCursor();
-	this->input_line_->setState(sfSelected, false);
-	this->input_line_->draw();
-};
-void CommandLineWindow::enable_input_line()
-{
-	this->allow_input_ = true;
-	this->input_line_->showCursor();
-	this->input_line_->setState(sfSelected, true);
-	this->input_line_->draw();
-};
-
-void CommandLineWindow::handleEvent(TEvent& _event)
-{
-
-	TWindow::handleEvent(_event);
-
-	if (_event.what == evKeyDown)
-	{
-		switch (_event.keyDown.keyCode)
-		{
-		case kbEnter:
-			this->got_user_input();
-			break;
-		case kbEsc:
-			this->disable_input_line();
-			break;
-		case kbAltRight:
-			this->terminal_->push_message(EMUTerminal::Message::Step{});
-			break;
-		default:
-			break;
-		};
-		clearEvent(_event);
-	}
-	else if (_event.what == evMouseDown)
-	{
-		MouseEventType _s;
-		switch (_event.mouse.buttons)
-		{
-		case mbLeftButton:
-			this->enable_input_line();
-			break;
-		default:
-			break;
-		};
-		clearEvent(_event);
-	};
-
-}
-
-void CommandLineWindow::clear_user_input()
-{
-	this->input_line_->curPos = 0;
-	std::memset(this->input_line_->data, 0, this->input_line_->dataSize());
-};
-
-void CommandLineWindow::got_user_input()
-{
-	auto _str = std::string{ this->input_line_->data };
-	this->terminal_->push_message(EMUTerminal::Message::GotInput{ _str });
-	this->clear_user_input();
-	this->input_line_->draw();
-};
-
 
 
 
@@ -334,98 +148,104 @@ public:
 
 	THelloApp(EMUTerminal* _terminal);
 
+
 	virtual void handleEvent(TEvent& event);
 	static TMenuBar* initMenuBar(TRect);
 	static TStatusLine* initStatusLine(TRect);
 
+	TPalette& getPalette() const override
+	{
+		static TPalette _plt{ EMU_PALETTE, sizeof(EMU_PALETTE) - 1 };
+		return _plt;
+	};
+
 	static inline std::optional<std::string> EDIT_FILE_PATH{ std::nullopt };
+
+
 
 	void idle() override;
 	void run() override;
+	
 
-	TPalette& getPalette()const override
-	{
-		static TPalette _plt{ EMULATOR_PALLETE_COLOR, sizeof(EMULATOR_PALLETE_COLOR) - 1 };
-		return _plt;
-	};
 
 	~THelloApp();
 
 private:
 	EMUTerminal* terminal_;
 
-	CommandLineWindow* cmd_line_ = nullptr;
-
-
+	etv::RegistersWindow* reg_window_ = nullptr;
+	x69::emu::tv::TerminalWindow* terminal_window_ = nullptr;
 
 	void open_registers_window();
 	void open_terminal_window();
-	void open_command_line_window();
 	void open_file_editor();
+	void open_shell();
+	void open_ide();
 
 };
 
 void THelloApp::run()
 {
-	this->open_command_line_window();
+	this->open_shell();
 	TApplication::run();
 };
 
 THelloApp::THelloApp(EMUTerminal* _terminal) :
 	TProgInit{&THelloApp::initStatusLine, &THelloApp::initMenuBar, &THelloApp::initDeskTop},
 	terminal_{ _terminal }
-{
-
-};
+{};
 THelloApp::~THelloApp()
 {
 	this->terminal_->push_message(EMUTerminal::Message::Exited{});
 };
 
-
 void THelloApp::open_registers_window()
 {
+	if (this->reg_window_)
+	{
+		this->remove(this->reg_window_);
+	};
+
 	TRect _r{ 0, 0, 26, 7 };
-	auto* _window = new RegistersWindow{ _r, "Registers", ++winNumber };
-	this->deskTop->insert(_window);
+	this->reg_window_ = new etv::RegistersWindow{ _r, "Registers", ++winNumber };
+	this->deskTop->insert(this->reg_window_);
 	
 };
 void THelloApp::open_terminal_window()
 {
+	if (this->terminal_window_)
+	{
+		this->remove(this->terminal_window_);
+	};
+
 	TRect _r{ 0, 0, 26, 7 };
-	auto* _window = new TerminalWindow{ _r, "Terminal", ++winNumber };
-	this->deskTop->insert(_window);
-};
-void THelloApp::open_command_line_window()
-{
-	auto _thisRect = this->getBounds();
-	TRect _r = _thisRect;
-	_r.grow(-1, -1);
-	
-	_r.a.x = 0;
-	_r.a.y = _thisRect.b.y - 3;
-
-	_r.b.x = _thisRect.b.x;
-	_r.b.y = _thisRect.b.y;
-
-	auto* _window = new CommandLineWindow{ _r, "CommandLine", ++winNumber, this->terminal_ };
-	this->deskTop->insert(_window);
-	this->cmd_line_ = _window;
-
+	this->terminal_window_ = new x69::emu::tv::TerminalWindow{ _r, "Terminal", ++winNumber };
+	this->terminal_window_->palette = 0;
+	this->deskTop->insert(this->terminal_window_);
 };
 
 void THelloApp::open_file_editor()
 {
-	this->cmd_line_->disable_input_line();
-	this->cmd_line_->setState(sfSelected, false);
-
 	auto _r = this->getClipRect();
 	TRect _editWindowRect{ 0, 0, _r.b.x - 16, 32 };
-	auto* _window = new AssemblyEditorWindow{ _editWindowRect, EDIT_FILE_PATH->c_str(), ++winNumber, this->terminal_ };
+	auto* _window = new x69::emu::tv::AssemblyEditorWindow{ _editWindowRect, EDIT_FILE_PATH->c_str(), ++winNumber, this->terminal_ };
 	this->deskTop->insert(_window);
 
 };
 
+void THelloApp::open_shell()
+{
+	TRect _rect = this->deskTop->getClipRect();
+	auto _window = new x69::emu::tv::ShellWindow{ _rect, ++winNumber, this->terminal_ };
+	this->deskTop->insert(_window);
+};
+
+void THelloApp::open_ide()
+{
+	TRect _rect = this->deskTop->getClipRect();
+	auto _window = new IDEWindow{ _rect, "ide", ++winNumber };
+	this->deskTop->insert(_window);
+};
 
 void THelloApp::handleEvent(TEvent& _event)
 {
@@ -440,8 +260,15 @@ void THelloApp::handleEvent(TEvent& _event)
 		case cmOpenTerminal:
 			open_terminal_window();
 			break;
-		case cmOpenCommandLine:
-			open_command_line_window();
+		case cmOpenShell:
+			this->open_shell();
+			break;
+		case cmOpenIDE:
+			this->open_ide();
+			break;
+		case cmOpenAll:
+			this->open_registers_window();
+			this->open_terminal_window();
 			break;
 		default:
 			break;
@@ -459,13 +286,14 @@ TMenuBar* THelloApp::initMenuBar(TRect r)
 		*new TSubMenu("View", kbAltH) +
 		*new TMenuItem("Terminal", cmOpenTerminal, kbAltT) +
 		*new TMenuItem("Registers", cmOpenRegisters, kbAltR) +
-		*new TMenuItem("CommandLine", cmOpenCommandLine, kbAltC) +
+		*new TMenuItem("All", cmOpenAll, kbAltA) +
+		*new TMenuItem("Shell", cmOpenShell, kbAltS) +
+		*new TMenuItem("IDE", cmOpenIDE, kbAltE) +
 		newLine() +
 		*new TMenuItem("Exit", cmQuit, cmQuit, hcNoContext, "Alt-X")
 	);
 
 }
-
 TStatusLine* THelloApp::initStatusLine(TRect r)
 {
 	r.a.y = r.b.y - 1;
@@ -476,8 +304,6 @@ TStatusLine* THelloApp::initStatusLine(TRect r)
 	);
 }
 
-
-
 void THelloApp::idle()
 {
 	TApplication::idle();
@@ -487,13 +313,13 @@ void THelloApp::idle()
 		this->shutDown();
 	};
 
-	if (RegisterPrintout::has_active())
+	if (this->terminal_window_)
 	{
-		RegisterPrintout::get_active()->draw();
+		this->terminal_window_->redraw();
 	};
-	if (TerminalPrintout::has_active())
+	if (this->reg_window_)
 	{
-		TerminalPrintout::get_active()->draw();
+		this->reg_window_->redraw();
 	};
 
 	if (this->EDIT_FILE_PATH)
@@ -504,13 +330,15 @@ void THelloApp::idle()
 
 };
 
+
+
+
+
 namespace x69::emu::peripheral::terminal
 {
 	void open_terminal(uint8_t _width, uint8_t _height)
 	{
-		terminal_vals.width = _width;
-		terminal_vals.height = _height;
-		terminal_vals.data.resize((size_t)_width * (size_t)_height);
+		tv::TERMINAL_VALUES.resize(_width, _height);
 		//tthread_ = std::thread{ &terminal_thread };
 	};
 	void close_terminal()
@@ -520,31 +348,31 @@ namespace x69::emu::peripheral::terminal
 
 	void set_character(char _c, uint8_t _x, uint8_t _y)
 	{
-		terminal_vals.data.at(((size_t)_y * (size_t)terminal_vals.width) + (size_t)_x) = _c;
+		tv::TERMINAL_VALUES.at(_x, _y) = _c;
 	};
 	char get_character(uint8_t _x, uint8_t _y)
 	{
-		return terminal_vals.data.at(((size_t)_x * (size_t)terminal_vals.width) + (size_t)_y);
+		return tv::TERMINAL_VALUES.at(_x, _y);
 	};
 	void update_register_value(uint8_t _reg, uint8_t _val)
 	{
-		register_vals.regs[_reg] = _val;
+		etv::register_vals.regs[_reg] = _val;
 	};
 	void update_special_register(SPECIAL_REG _reg, uint16_t _val)
 	{
 		switch (_reg)
 		{
 		case SPECIAL_REG::PC:
-			register_vals.pc = _val;
+			etv::register_vals.pc = _val;
 			break;
 		case SPECIAL_REG::LR:
-			register_vals.lr = _val;
+			etv::register_vals.lr = _val;
 			break;
 		case SPECIAL_REG::SP:
-			register_vals.sp = _val;
+			etv::register_vals.sp = _val;
 			break;
 		case SPECIAL_REG::ADDR:
-			register_vals.addr = _val;
+			etv::register_vals.addr = _val;
 			break;
 		default:
 			abort();
@@ -555,7 +383,7 @@ namespace x69::emu::peripheral::terminal
 	
 	void clear_terminal()
 	{
-		std::memset(terminal_vals.data.data(), 0, terminal_vals.data.size() * sizeof(typename decltype(terminal_vals.data)::value_type));
+		std::fill(tv::TERMINAL_VALUES.begin(), tv::TERMINAL_VALUES.end(), 0);
 	};
 
 };
@@ -702,7 +530,7 @@ namespace x69::emu
 
 
 	Terminal::Terminal(std::streambuf* _einBuf, std::streambuf* _eoutBuf) : 
-		ein_{ _einBuf }, eout_{ _eoutBuf }
+		ein{ _einBuf }, eout{ _eoutBuf }
 	{};
 
 	Terminal::~Terminal()
