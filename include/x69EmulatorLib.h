@@ -77,8 +77,6 @@ namespace x69::emu
 
 	};
 
-
-
 	static std::optional<x69Peripheral> open_peripheral_lib(const std::filesystem::path& _path)
 	{
 		
@@ -109,107 +107,12 @@ namespace x69::emu
 #undef max
 #undef min
 
-
-
-
-#pragma region ANSI_CONSTANTS
-
-namespace x69::emu
-{
-	static inline HANDLE hConsole = GetStdHandle(STD_OUTPUT_HANDLE);
-
-	namespace ccodes
-	{
-		constexpr static inline auto NONE = 15;
-		constexpr static inline auto BLACK = 0;
-		constexpr static inline auto RED = 12;
-		constexpr static inline auto GREEN = 10;
-		constexpr static inline auto YELLOW = 14;
-		constexpr static inline auto BLUE = 9;
-		//constexpr static inline auto MAGENTA = "\033[35m";
-		//constexpr static inline auto CYAN = "\033[36m";
-		constexpr static inline auto WHITE = 15;
-		//constexpr static inline auto BOLDBLACK = "\033[1m\033[30m";
-		//constexpr static inline auto BOLDRED = "\033[1m\033[31m";
-		//constexpr static inline auto BOLDGREEN = "\033[1m\033[32m";
-		//constexpr static inline auto BOLDYELLOW = "\033[1m\033[33m";
-		//constexpr static inline auto BOLDBLUE = "\033[1m\033[34m";
-		//constexpr static inline auto BOLDMAGENTA = "\033[1m\033[35m";
-		//constexpr static inline auto BOLDCYAN = "\033[1m\033[36m";
-		//constexpr static inline auto BOLDWHITE = "\033[1m\033[37m";
-
-		static inline void set_text_color(std::ostream& _ostr, int _col)
-		{
-			SetConsoleTextAttribute(hConsole, _col);
-		};
-
-	};
-};
-
-#pragma endregion ANSI_CONSTANTS
-
 #elif defined(__linux__) || defined(__unix__)
-
-#pragma region ANSI_CONSTANTS
-
-namespace x69::emu
-{
-
-	namespace ccodes
-	{
-
-		constexpr static inline auto NONE = "\033[0m";
-		constexpr static inline auto BLACK = "\033[30m";      /* Black */
-		constexpr static inline auto RED = "\033[31m";      /* Red */
-		constexpr static inline auto GREEN = "\033[32m";      /* Green */
-		constexpr static inline auto YELLOW = "\033[33m";      /* Yellow */
-		constexpr static inline auto BLUE = "\033[34m";      /* Blue */
-		//constexpr static inline auto MAGENTA = "\033[35m";      /* Magenta */
-		//constexpr static inline auto CYAN = "\033[36m";      /* Cyan */
-		constexpr static inline auto WHITE = "\033[37m";      /* White */
-		//constexpr static inline auto BOLDBLACK = "\033[1m\033[30m";      /* Bold Black */
-		//constexpr static inline auto BOLDRED = "\033[1m\033[31m";      /* Bold Red */
-		//constexpr static inline auto BOLDGREEN = "\033[1m\033[32m";      /* Bold Green */
-		//constexpr static inline auto BOLDYELLOW = "\033[1m\033[33m";      /* Bold Yellow */
-		//constexpr static inline auto BOLDBLUE = "\033[1m\033[34m";      /* Bold Blue */
-		//constexpr static inline auto BOLDMAGENTA = "\033[1m\033[35m";      /* Bold Magenta */
-		//constexpr static inline auto BOLDCYAN = "\033[1m\033[36m";      /* Bold Cyan */
-		//constexpr static inline auto BOLDWHITE = "\033[1m\033[37m";      /* Bold White */
-
-		void set_text_color(std::ostream& _ostr, const char* _col)
-		{
-			_ostr << _col;
-		};
-
-	};
-
-}
-#pragma endregion ANSI_CONSTANTS
-
 #else
-
-namespace x69::emu
-{
-	namespace ccodes
-	{
-		void set_text_color(std::ostream& _ostr, const char* _col)
-		{};
-	}
-
-}
-
-
 #endif
 
-
-
-
-
-
-
 namespace x69::emu
 {
-
 	struct PrivilegeFlag
 	{
 	public:
@@ -237,81 +140,10 @@ namespace x69::emu
 
 	std::optional<PeripheralLayout> parse_peripherals_file(const std::filesystem::path& _path);
 
-
-
 	template <typename T>
 	constexpr static inline T twos(T _v) noexcept
 	{
 		return !_v + 1;
-	};
-
-	struct color
-	{
-	public:
-		enum COLORS
-		{
-			RED,
-			BLUE,
-			WHITE,
-			BLACK,
-			YELLOW,
-			GREEN,
-			NONE
-		};
-
-	private:
-		template <COLORS Col>
-		struct color_t
-		{
-			friend inline std::ostream& operator<<(std::ostream& _ostr, const color_t<Col>& _col)
-			{
-				if constexpr (Col == COLORS::NONE)
-				{
-					ccodes::set_text_color(_ostr, ccodes::NONE);
-				}
-				else if constexpr (Col == COLORS::RED)
-				{
-					ccodes::set_text_color(_ostr, ccodes::RED);
-				}
-				else if constexpr (Col == COLORS::BLUE)
-				{
-					ccodes::set_text_color(_ostr, ccodes::BLUE);
-				}
-				else if constexpr (Col == COLORS::GREEN)
-				{
-					ccodes::set_text_color(_ostr, ccodes::GREEN);
-				}
-				else if constexpr (Col == COLORS::WHITE)
-				{
-					ccodes::set_text_color(_ostr, ccodes::WHITE);
-				}
-				else if constexpr (Col == COLORS::BLACK)
-				{
-					ccodes::set_text_color(_ostr, ccodes::BLACK);
-				}
-				else if constexpr (Col == COLORS::YELLOW)
-				{
-					ccodes::set_text_color(_ostr, ccodes::YELLOW);
-				}
-				else
-				{
-					static_assert(false);
-				};
-
-				return _ostr;
-			};
-		};
-
-	public:
-
-		static inline constexpr auto none = color_t<COLORS::NONE>{};
-		static inline constexpr auto red = color_t<COLORS::RED>{};
-		static inline constexpr auto blue = color_t<COLORS::BLUE>{};
-		static inline constexpr auto white = color_t<COLORS::WHITE>{};
-		static inline constexpr auto black = color_t<COLORS::BLACK>{};
-		static inline constexpr auto yellow = color_t<COLORS::YELLOW>{};
-		static inline constexpr auto green = color_t<COLORS::GREEN>{};
-
 	};
 
 	template <typename T>
@@ -346,8 +178,6 @@ namespace x69::emu
 	};
 
 	using CPUVersionTraits = CPUTraits<16, uint8_t, uint16_t>;
-
-
 
 	struct Instruction
 	{
@@ -431,16 +261,6 @@ namespace x69::emu
 		constexpr const value_type& operator[](uint8_t _r) const noexcept
 		{
 			return this->at(_r);
-		};
-
-		friend inline std::ostream& operator<<(std::ostream& _ostr, CPURegisters& _regs)
-		{
-			uint8_t _rnum = 0;
-			for (auto& r : _regs)
-			{
-				_ostr << color::blue << "r" << (int)_rnum++ << color::none << " : 0x" << std::hex << (int)r << std::dec << "\n";
-			};
-			return _ostr;
 		};
 
 		constexpr size_t size() const noexcept { return this->regs_.size(); };
@@ -601,20 +421,9 @@ namespace x69::emu
 			return this->at(_r);
 		};
 
-		friend inline std::ostream& operator<<(std::ostream& _ostr, SpecialRegisters& _regs)
-		{
-			_ostr << color::yellow << "pc  " << color::none << " : 0x" << std::hex << (int)_regs.at(PC) << std::dec << "\n";
-			_ostr << color::yellow << "lr  " << color::none << " : 0x" << std::hex << (int)_regs.at(LR) << std::dec << "\n";
-			_ostr << color::yellow << "sp  " << color::none << " : 0x" << std::hex << (int)_regs.at(SP) << std::dec << "\n";
-			_ostr << color::yellow << "addr" << color::none << " : 0x" << std::hex << (int)_regs.at(ADDR) << std::dec << "\n";
-			return _ostr;
-		};
-
 		constexpr size_t size() const noexcept { return this->regs_.size(); };
 
 	};
-
-
 
 	struct PeripheralAPI
 	{
@@ -633,7 +442,6 @@ namespace x69::emu
 	struct TerminalPeriphal : public PeripheralAPI
 	{
 	protected:
-
 		bool is_open_ = false;
 
 		void open(uint8_t _width, uint8_t _height);
@@ -659,7 +467,6 @@ namespace x69::emu
 		char get_char(uint8_t _x, uint8_t _y);
 
 	public:
-
 		address_type size() const final
 		{
 			return 4;
@@ -707,7 +514,6 @@ namespace x69::emu
 				break;
 			};
 		};
-
 
 	};
 
@@ -1417,7 +1223,6 @@ namespace x69::emu
 	};
 
 	std::optional<std::vector<uint8_t>> load_x69_machine_code(const std::filesystem::path& _path);
-
 
 }
 

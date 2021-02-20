@@ -1,5 +1,4 @@
 #include <x69EmulatorLib.h>
-#include <x69Terminal.h>
 #include <x69Assembler.h>
 
 #include <iostream>
@@ -257,14 +256,6 @@ public:
 		return this->ecpu_;
 	};
 
-	auto& terminal() noexcept
-	{
-		return this->terminal_;
-	};
-	const auto& terminal() const noexcept
-	{
-		return this->terminal_;
-	};
 
 protected:
 	static void cmd_pause(Emulator* _ptr, const std::string& _str)
@@ -326,7 +317,6 @@ protected:
 		{
 			return;
 		};
-		_ptr->terminal().edit_file(_ts[1]);
 
 		return;
 	};
@@ -334,8 +324,7 @@ protected:
 public:
 
 	Emulator() :
-		ecpu_{ &direct_memory_ },
-		terminal_{ tout_.rdbuf(), tin_.rdbuf() }
+		ecpu_{ &direct_memory_ }
 	{
 		this->insert_command("do", &cmd_do);
 		this->insert_command("load", &cmd_load);
@@ -359,7 +348,6 @@ private:
 	std::istringstream tin_{};
 
 	em::Memory direct_memory_{};
-	em::Terminal terminal_;
 	em::CPU ecpu_;
 
 	EnvironmentVars env_{};
@@ -478,36 +466,9 @@ void run_emulator(Emulator* _emu)
 	while (_keepRunning)
 	{
 		_emu->update();
-
-		while (_emu->terminal().has_message())
-		{
-			using MSG_E = em::Terminal::Message::MESSAGE_TYPE_E;
-
-			auto _msg = _emu->terminal().next_message();
-			switch (_msg.index())
-			{
-			case MSG_E::EXITED:
-				_keepRunning = false;
-				break;
-			case MSG_E::GOT_INPUT:
-				_emu->process_command(_msg.get<MSG_E::GOT_INPUT>().str_);
-				break;
-			case MSG_E::STEP:
-				_emu->step();
-				break;
-			default:
-				abort();
-			};
-
-		};
-
 	};
 
-
-
 };
-
-
 
 int imain(int argc, char* argv[], char* envp[])
 {
@@ -532,12 +493,6 @@ int imain(int argc, char* argv[], char* envp[])
 			std::cout << "Failed to load peripheral : " << _p.path << '\n';
 		};
 
-	};
-
-	auto _goodOpen = emu_.terminal().open();
-	if (!_goodOpen)
-	{
-		return -1;
 	};
 
 	std::cout << "x69 Emulator v0.0.1\n";
@@ -584,9 +539,6 @@ int imain(int argc, char* argv[], char* envp[])
 	};
 
 	run_emulator(&emu_);
-
-	std::cout << emu_.ecpu().registers() << '\n';
-	std::cout << emu_.ecpu().special_regs() << '\n';
 
 	return 0;
 };

@@ -1,8 +1,5 @@
 #include "x69EmulatorLib.h"
 
-#include <x69Terminal.h>
-
-
 namespace x69::emu
 {
 
@@ -142,20 +139,6 @@ namespace x69::emu
 		{
 			this->pc_lock_ = false;
 		};
-
-		uint8_t _rcounter = 0;
-		for (auto& r : this->registers())
-		{
-			peripheral::terminal::update_register_value(_rcounter++, r);
-		};
-
-		namespace tm = peripheral::terminal;
-
-		tm::update_special_register(tm::SPECIAL_REG::PC, this->special_regs()[SpecialRegisters::PC]);
-		tm::update_special_register(tm::SPECIAL_REG::LR, this->special_regs()[SpecialRegisters::LR]);
-		tm::update_special_register(tm::SPECIAL_REG::SP, this->special_regs()[SpecialRegisters::SP]);
-		tm::update_special_register(tm::SPECIAL_REG::ADDR, this->special_regs()[SpecialRegisters::ADDR]);
-
 
 	};
 	
