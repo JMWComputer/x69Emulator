@@ -1,3 +1,0 @@
-as:<path / name of assembler executable>
-ld:<unused for now>
-comp:<path / name of compiler executable>

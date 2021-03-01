@@ -1,4 +1,4 @@
-#include "x69EmulatorLib.h"
+#include "x69Emulator.h"
 
 #include "Emulator.h"
 
