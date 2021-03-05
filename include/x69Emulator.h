@@ -55,8 +55,10 @@ namespace x69::emu
 	Word get_cpu_register(Emulator* _emu, CPU_REGISTERS_E _reg);
 	std::array<Word, 16> get_all_cpu_registers(Emulator* _emu);
 
-	Word get_special_register(Emulator* _emu, CPU_REGISTERS_E _reg);
-	std::array<Word, 4> get_all_special_registers(Emulator* _emu);
+	using DWord = uint16_t;
+
+	DWord get_special_register(Emulator* _emu, SPECIAL_REGISTERS_E _reg);
+	std::array<DWord, 4> get_all_special_registers(Emulator* _emu);
 
 	bool load_program(Emulator* _emu, const uint8_t* _pBegin, const size_t _pSize);
 	bool load_program(Emulator* _emu, std::istream& _istr);
