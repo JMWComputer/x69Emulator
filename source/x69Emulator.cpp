@@ -39,13 +39,13 @@ namespace x69::emu
 		return _out;
 	};
 
-	Word get_special_register(Emulator* _emu, CPU_REGISTERS_E _reg)
+	DWord get_special_register(Emulator* _emu, SPECIAL_REGISTERS_E _reg)
 	{
 		return _emu->cpu_.special_regs().at((emu::SpecialRegisters::REGISTERS)_reg);
 	};
-	std::array<Word, 4> get_all_special_registers(Emulator* _emu)
+	std::array<DWord, 4> get_all_special_registers(Emulator* _emu)
 	{
-		std::array<Word, 4> _out{};
+		std::array<DWord, 4> _out{};
 		auto& _regs = _emu->cpu_.special_regs();
 		int _rc = 0;
 		for (auto& r : _regs)

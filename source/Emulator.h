@@ -298,7 +298,7 @@ namespace x69::emu
 
 		constexpr bool get(FLAGS _f) const noexcept
 		{
-			return this->bits & (uint8_t)_f;
+			return (this->bits & (uint8_t)_f) != 0;
 		};
 
 		void set(FLAGS _f) noexcept
@@ -310,7 +310,7 @@ namespace x69::emu
 		};
 		void clear(FLAGS _f) noexcept
 		{
-			this->bits &= !(uint8_t)_f;
+			this->bits &= ~(uint8_t)_f;
 		};
 
 		void set_to(FLAGS _f, bool _to) noexcept
@@ -724,6 +724,11 @@ namespace x69::emu
 				if (_conditionMet)
 				{
 					this->preform_jump_op(_ins);
+				}
+				else
+				{
+					// Condition not met
+					bool _b = false;
 				};
 			}
 			else if ((_ins.ibyte & bit_masks::CPU_RESERVED_OP) != 0)
@@ -908,25 +913,25 @@ namespace x69::emu
 				this->alu_flags_.set_to(ALUFlags::Z, _rb == 0);
 				break;
 			case ALU_OPS::ADD:
-				this->alu_flags_.set_to(ALUFlags::C, (_a + _b) < _b);
+				this->alu_flags_.set_to(ALUFlags::C, (word_type)(_a + _b) < _b);
 				_rb = _a + _b;
 				this->alu_flags_.set_to(ALUFlags::Z, _rb == 0);
 				break;
 			case ALU_OPS::ADC:
 				if (_flags.get(ALUFlags::C))
 				{
-					this->alu_flags_.set_to(ALUFlags::C, (_a + _b + 1) < _b);
+					this->alu_flags_.set_to(ALUFlags::C, (word_type)(_a + _b + 1) < _b);
 					_rb = _a + _b + 1;
 				}
 				else
 				{
-					this->alu_flags_.set_to(ALUFlags::C, (_a + _b) < _b);
+					this->alu_flags_.set_to(ALUFlags::C, (word_type)(_a + _b) < _b);
 					_rb = _a + _b;
 				};
 				this->alu_flags_.set_to(ALUFlags::Z, _rb == 0);
 				break;
 			case ALU_OPS::SUB:
-				this->alu_flags_.set_to(ALUFlags::C, (_a + twos(_b)) < twos(_b));
+				this->alu_flags_.set_to(ALUFlags::C, (word_type)(_a + twos(_b)) < twos(_b));
 				this->alu_flags_.set_to(ALUFlags::T, _a >= _b);
 				_rb = _a + twos(_b);
 				this->alu_flags_.set_to(ALUFlags::Z, _rb == 0);
@@ -934,13 +939,13 @@ namespace x69::emu
 			case ALU_OPS::SBC:
 				if (_flags.get(ALUFlags::C))
 				{
-					this->alu_flags_.set_to(ALUFlags::C, (_a + twos(_b + 1)) < twos(_b + 1));
+					this->alu_flags_.set_to(ALUFlags::C, (word_type)(_a + twos(_b + 1)) < twos(_b + 1));
 					this->alu_flags_.set_to(ALUFlags::T, _a == (_b + 1));
 					_rb = _a + twos(_b + 1);
 				}
 				else
 				{
-					this->alu_flags_.set_to(ALUFlags::C, (_a + twos(_b)) < twos(_b));
+					this->alu_flags_.set_to(ALUFlags::C, (word_type)(_a + twos(_b)) < twos(_b));
 					this->alu_flags_.set_to(ALUFlags::T, _a == _b);
 					_rb = _a + twos(_b);
 				};
@@ -973,7 +978,7 @@ namespace x69::emu
 				this->alu_flags_.set_to(ALUFlags::Z, _rb == 0);
 				break;
 			case ALU_OPS::CMP:
-				this->alu_flags_.set_to(ALUFlags::C, (_a + twos(_b)) < twos(_b));
+				this->alu_flags_.set_to(ALUFlags::C, (word_type)(_a + twos(_b)) < twos(_b));
 				this->alu_flags_.set_to(ALUFlags::T, _a >= _b);
 				this->alu_flags_.set_to(ALUFlags::Z, _a == _b);
 				break;
