@@ -34,7 +34,7 @@ namespace x69::emu
 		int _rc = 0;
 		for (auto& r : _regs)
 		{
-			_out[_rc] = r;
+			_out[_rc++] = r;
 		};
 		return _out;
 	};
@@ -50,7 +50,7 @@ namespace x69::emu
 		int _rc = 0;
 		for (auto& r : _regs)
 		{
-			_out[_rc] = r;
+			_out[_rc++] = r;
 		};
 		return _out;
 	};
