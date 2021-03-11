@@ -87,11 +87,28 @@ namespace x69::emu
 		return _mcode.has_value();
 	};
 
-	void step(Emulator* _emu)
+	void step(Emulator* _emu, size_t n)
 	{
-		_emu->cpu_.step();
+		for (size_t i = 0; i != n; ++i)
+		{
+			_emu->cpu_.step();
+		};
 	};
 
-	
+	namespace dbg
+	{
+		void set_cpu_register(Emulator* _emu, CPU_REGISTERS_E _regSelect, Word _val)
+		{
+			auto& _regs = _emu->cpu_.special_regs();
+			auto& _reg = _regs.at((emu::SpecialRegisters::REGISTERS)_regSelect);
+			_reg = _val;
+		};
+		void set_special_register(Emulator* _emu, SPECIAL_REGISTERS_E _sregSelect, DWord _val)
+		{
+			auto& _sregs = _emu->cpu_.special_regs();
+			auto& _reg = _sregs.at((emu::SpecialRegisters::REGISTERS)_sregSelect);
+			_reg = _val;
+		};
+	};
 };
 

@@ -19,11 +19,13 @@ int main()
 		std::terminate();
 	};
 
+	emu::dbg::set_special_register(_emu, emu::rPC, 0x00FF);
+
 	std::string _foo{};
 
 	while (true)
 	{
-		emu::step(_emu);
+	//	emu::step(_emu, 2);
 		auto _regs = emu::get_all_cpu_registers(_emu);
 		for (auto& r : _regs)
 		{

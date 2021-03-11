@@ -21,7 +21,7 @@ namespace x69::emu
 
 	Emulator* new_emulator();
 	void destroy_emulator(Emulator* _emulator);
-	
+
 	enum CPU_REGISTERS_E
 	{
 		r0,
@@ -64,8 +64,13 @@ namespace x69::emu
 	bool load_program(Emulator* _emu, std::istream& _istr);
 	bool load_program(Emulator* _emu, const std::filesystem::path& _path);
 
-	void step(Emulator* _emu);
-	
+	void step(Emulator* _emu, size_t n = 1);
+
+	namespace dbg
+	{
+		void set_cpu_register(Emulator* _emu, CPU_REGISTERS_E _reg, Word _val);
+		void set_special_register(Emulator* _emu, SPECIAL_REGISTERS_E _reg, DWord _val);
+	};
 
 };
 
